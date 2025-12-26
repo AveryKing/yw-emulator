@@ -33,6 +33,13 @@ export class Client {
         this.send(xml);
     }
 
+    /**
+     * Helper to send a JSON response.
+     */
+    public sendJson(data: any): void {
+        this.send(JSON.stringify(data));
+    }
+
     public getSocket(): WebSocket {
         return this.socket;
     }
