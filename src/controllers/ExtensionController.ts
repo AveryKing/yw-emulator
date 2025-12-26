@@ -1,9 +1,5 @@
 import { Client } from "../models/Client";
-import {
-  activatePlayerResponse,
-  modelResponses,
-  rentToBuyItems,
-} from "../data/mockData";
+import { LOGIN_SEQUENCE, rentToBuyItems } from "../data/mockData";
 
 export class ExtensionController {
   /**
@@ -59,27 +55,38 @@ export class ExtensionController {
   }
 
   private handleActivatePlayer(client: Client, data: any): void {
-    // 1. Send activatePlayer response
-    // We use the mock data but override the playerId to match the request if needed
-    const response = {
-      ...activatePlayerResponse,
-      playerId: data.playerId || client.id,
-      sessionId: `${data.playerId || client.id}_${Math.floor(
-        Date.now() / 1000
-      )}`,
-    };
+    console.log(`[Extension] Starting Login Sequence for ${client.username}`);
 
-    // Override player name if available
-    if (client.username) {
-      response.player.name = client.username;
-    }
+    // Iterate through the recorded login sequence
+    for (const packet of LOGIN_SEQUENCE) {
+      // Create a shallow copy to avoid modifying the original mock data permanently
+      // (though for deep objects like 'player', be careful if you need deep cloning)
+      let payload = JSON.parse(JSON.stringify(packet));
 
-    this.sendXtResponse(client, response);
+      // Dynamic Patching for the initial activation packet
+      if (payload._cmd === "activatePlayer") {
+        payload.playerId = data.playerId || client.id;
+        // Generate a session ID if needed, or use the one from the client/server logic
+        payload.sessionId = `${payload.playerId}_${Math.floor(
+          Date.now() / 1000
+        )}`;
 
-    // 2. Send sequence of ModelStore.modelResponse packets
-    // These are sent immediately after activation to load game data
-    for (const modelResponse of modelResponses) {
-      this.sendXtResponse(client, modelResponse);
+        if (client.username) {
+          if (payload.player) {
+            payload.player.name = client.username;
+            payload.player.playerId = payload.playerId;
+          }
+        }
+        console.log(
+          `[Extension] Sending activatePlayer response for ID: ${payload.playerId}`
+        );
+      } else {
+        console.log(
+          `[Extension] Replaying packet: ${payload._cmd} (ModelID: ${payload.m?.modelID})`
+        );
+      }
+
+      this.sendXtResponse(client, payload);
     }
   }
 
