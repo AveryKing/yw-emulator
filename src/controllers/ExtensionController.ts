@@ -1,4 +1,9 @@
 import { Client } from "../models/Client";
+import {
+  activatePlayerResponse,
+  modelResponses,
+  rentToBuyItems,
+} from "../data/mockData";
 
 export class ExtensionController {
   /**
@@ -44,6 +49,9 @@ export class ExtensionController {
           `[Movement] ${client.username} moved to (${data.x}, ${data.y})`
         );
         break;
+      case "getRentToBuyItems":
+        this.handleGetRentToBuyItems(client);
+        break;
       default:
         console.log(`[Extension] Unhandled JSON command: ${cmd}`);
         break;
@@ -51,23 +59,35 @@ export class ExtensionController {
   }
 
   private handleActivatePlayer(client: Client, data: any): void {
+    // 1. Send activatePlayer response
+    // We use the mock data but override the playerId to match the request if needed
     const response = {
-      _cmd: "activatePlayer",
-      result: true,
+      ...activatePlayerResponse,
       playerId: data.playerId || client.id,
-      defaultZoneName: "h110456127",
-      player: {
-        coins: 1000000,
-        cash: 5000,
-        name: client.username || "YoUser",
-        sex: 1,
-        isModerator: false,
-        isVip: true,
-        level: 50,
-        xp: 10000,
-      },
+      sessionId: `${data.playerId || client.id}_${Math.floor(
+        Date.now() / 1000
+      )}`,
     };
 
+    // Override player name if available
+    if (client.username) {
+      response.player.name = client.username;
+    }
+
+    this.sendXtResponse(client, response);
+
+    // 2. Send sequence of ModelStore.modelResponse packets
+    // These are sent immediately after activation to load game data
+    for (const modelResponse of modelResponses) {
+      this.sendXtResponse(client, modelResponse);
+    }
+  }
+
+  private handleGetRentToBuyItems(client: Client): void {
+    const response = {
+      _cmd: "getRentToBuyItems",
+      items: rentToBuyItems,
+    };
     this.sendXtResponse(client, response);
   }
 
