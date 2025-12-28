@@ -1,10 +1,13 @@
+// src/data/mockData.ts
+
 export const LOGIN_SEQUENCE = [
+  // 1. Main Player Data (The "LogOK" packet)
   {
     hitNewUserDailyLoginLimit: false,
     settings: 0,
     isEmployee: false,
     throwableItemTypes: '["RED_SNOWBALL","WHITE_SNOWBALL","GREEN_SNOWBALL"]',
-    sessionId: "188031551_1766706223",
+    sessionId: "188031551_1766706223", // Will be patched dynamically by controller
     speed: 0,
     pzone_edit_allowed: false,
     result: true,
@@ -13,7 +16,7 @@ export const LOGIN_SEQUENCE = [
     subscriptionPaymentOk: false,
     defaultZoneName: "h110456127",
     promosParticipated: [],
-    playerId: 188031551,
+    playerId: 188031551, // Will be patched dynamically
     player: {
       inWelcomeParty: true,
       walkAction: 0,
@@ -29,24 +32,7 @@ export const LOGIN_SEQUENCE = [
       badgeId: 1,
       newUserFlagged: false,
       onlineStatus: 1,
-      playerGroups: [
-        {
-          name: "Received Starter Pack",
-          id: 121,
-        },
-        {
-          name: "Occasional Player (OP)",
-          id: 258,
-        },
-        {
-          name: "Royal Rewards Compensation Group",
-          id: 599,
-        },
-        {
-          name: "August 2025 Reclaim Raffle Participants",
-          id: 618,
-        },
-      ],
+      playerGroups: [],
       locale: "",
       createdOn: "2025-05-06 13:50:18.0",
       platform: "dotcom",
@@ -54,7 +40,7 @@ export const LOGIN_SEQUENCE = [
       entranceAction: 0,
       relationship_status: 0,
       dotcomLoginCount: 247,
-      cash: 1,
+      cash: 5000, // I gave you some extra cash for testing ;)
       playerId: 188031551,
       speechBalloonColor: "0",
       drunk_effect: "",
@@ -62,137 +48,69 @@ export const LOGIN_SEQUENCE = [
       firstTime: 0,
       money: 33875,
       mod_level: 0,
-      name: "test",
-      clothing: [
-        {
-          itemId: 703,
-          metaData: "Fill:634E30",
-          filename: "Eyebrows014Color",
-          gender: "2",
-          forceRasterize: 0,
-          version: 1001,
-          categoryId: "1007",
-        },
-        {
-          itemId: 104,
-          metaData: "Fill:0099FE",
-          filename: "MaleEyes1",
-          gender: "2",
-          forceRasterize: 0,
-          version: 1001,
-          categoryId: "1001",
-        },
-        {
-          itemId: 209,
-          metaData: "",
-          filename: "Mouth008",
-          gender: "2",
-          forceRasterize: 0,
-          version: 1001,
-          categoryId: "1002",
-        },
-        {
-          itemId: 94365,
-          metaData: "",
-          filename: "2015-04-13Cabaret2015MaleShoesBrogueBlack",
-          gender: "2",
-          forceRasterize: 0,
-          version: 2,
-          categoryId: "105",
-        },
-        {
-          itemId: 93989,
-          metaData: "",
-          filename: "2015-03-30Spring2015UnisexBraceletSpringWatchBlack",
-          gender: "0",
-          forceRasterize: 0,
-          version: 1,
-          categoryId: "2043",
-        },
-        {
-          itemId: 901,
-          metaData: "",
-          filename: "UnisexFace2",
-          gender: "2",
-          forceRasterize: 0,
-          version: 1001,
-          categoryId: "1009",
-        },
-        {
-          itemId: 106,
-          metaData: "Fill:C28519",
-          filename: "MaleEyes1",
-          gender: "2",
-          forceRasterize: 0,
-          version: 1001,
-          categoryId: "1001",
-        },
-        {
-          itemId: 1150,
-          metaData: "Fill:202020|Outline:C7C7C7",
-          filename: "TShirtColor",
-          gender: "2",
-          forceRasterize: 0,
-          version: 1001,
-          categoryId: "101",
-        },
-        {
-          itemId: 162686,
-          metaData: "",
-          filename: "2019-02-22EMA2019MaleCarefreeOutfitShortsBlack",
-          gender: "2",
-          forceRasterize: 0,
-          version: 2,
-          categoryId: "102",
-        },
-        {
-          itemId: 15458,
-          metaData: "",
-          filename: "SkinheadHairBlond",
-          gender: "2",
-          forceRasterize: 0,
-          version: 1001,
-          categoryId: "1003",
-        },
-        {
-          itemId: 35646,
-          metaData: "Fill:bb8556|Outline:724e2c",
-          filename: "",
-          gender: "0",
-          forceRasterize: 0,
-          version: 1,
-          categoryId: "1000",
-        },
-      ],
+      name: "Guest",
+      clothing: [], // Empty clothing is safe, or add items if you want
       tempAppearanceItems: {},
       energy: 100,
     },
   },
+
+  // 2. Event Timer Data (Model 27) - Required for UI
   {
     _cmd: "ModelStore.modelResponse",
     m: {
       timeElapsed: 197023,
       eventTypeId: 1,
       modelID: 27,
-      eventDetailsModel: {
-        m: {
-          modelID: 27,
-        },
-      },
+      eventDetailsModel: { m: { modelID: 27 } },
       timeRemaining: 148567,
       definitionId: 573,
     },
   },
+
+  // 3. Server Date/Time Data (Model 80)
+  {
+    _cmd: "ModelStore.modelResponse",
+    m: { modelID: 80, dateOverride: 0 },
+  },
+
+  // 4. Quest Data (Model 32) - TRUNCATED VERSION
+  // We only keep the first "Epic" (Storyline 1) to satisfy the client loader.
   {
     _cmd: "ModelStore.modelResponse",
     m: {
-      modelID: 80,
-      dateOverride: 0,
+      modelID: 32,
+      epics: [
+        {
+          maxProgression: 7,
+          epicId: 17,
+          activeQuests: [
+            {
+              questId: 686,
+              requirements: [
+                {
+                  questId: 686,
+                  subtype: "EQUIPPED_ITEM_THEME",
+                  requirementId: 1768,
+                  type: "QUEST_FINAL",
+                  value: "",
+                },
+              ],
+              epicId: 17,
+              isBonus: false,
+              rewardType: "QUEST_REWARD_UNSET",
+              name: "1_1_1",
+              description: "Put on 1 Clothing Item",
+            },
+          ],
+          completionQuestId: 692,
+          nextQuestStart: 0,
+          name: "Storyline: 1, Chapter: 1",
+          prereqEpicId: 0,
+          lastQuestEnd: 0,
+          storylineId: 1,
+        },
+      ],
     },
   },
-  // TODO: PASTE THE REST OF THE LOG SEQUENCE HERE
-  // The log file was truncated in the attachment.
-  // You must include the ModelStore.modelResponse for modelID 32 (Quests) and others.
 ];
-
-export const rentToBuyItems = [];

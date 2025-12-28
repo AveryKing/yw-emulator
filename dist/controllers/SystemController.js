@@ -2,64 +2,48 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SystemController = void 0;
 class SystemController {
-    /**
-     * Handles the <policy-file-request/> sent by Flash/IceStone clients.
-     * Returns a permissive cross-domain policy to allow connections.
-     */
     handlePolicyRequest(client) {
-        const policy = `
-            <cross-domain-policy>
-                <allow-access-from domain="*" to-ports="*" />
-            </cross-domain-policy>
-        `.trim();
-        client.send(policy);
+        const policy = `<cross-domain-policy><allow-access-from domain='*' to-ports='9339' /></cross-domain-policy>`;
+        client.sendXml(policy);
     }
-    /**
-     * Handles the 'verChk' (Version Check) action.
-     * SFS Pro expects a success response (r='0') to proceed.
-     */
     handleVersionCheck(client, body) {
-        // Response format: <msg t='sys'><body action='verChk' r='0'><ver v='1.6.6' /></body></msg>
-        const response = `<msg t='sys'><body action='verChk' r='0'><ver v='1.6.6' /></body></msg>`;
-        client.sendXml(response);
-    }
-    /**
-     * Handles the 'login' action.
-     * Parses credentials (simplified for emulation) and returns the user object.
-     */
-    handleLogin(client, body) {
-        // Extract username from the login body
-        // Structure usually: <login z='zone'><nick><![CDATA[name]]></nick>...</login>
-        let username = 'Guest';
-        if (body.login && body.login[0] && body.login[0].nick) {
-            username = body.login[0].nick[0];
+        // 1. Get the version the client sent (e.g., "154")
+        // The parser puts attributes in '$' or directly in the object depending on settings.
+        // Based on your log: <ver v='154' /> inside <body ...>
+        let clientVer = "1.6.6"; // Default fallback
+        if (body.ver && body.ver[0] && body.ver[0].$ && body.ver[0].$.v) {
+            clientVer = body.ver[0].$.v;
         }
-        client.username = username;
-        client.isAuthenticated = true;
-        // SFS Pro Login Response
-        // Includes user ID, name, mod status, admin status.
-        const response = `
-            <msg t='sys'>
-                <body action='login' r='0'>
-                    <login z='YoWorld'>
-                        <nick><![CDATA[${username}]]></nick>
-                        <id>${client.id}</id>
-                        <mod>0</mod>
-                        <admin>0</admin>
-                    </login>
-                </body>
-            </msg>
-        `.replace(/\s+/g, ' '); // Minify for network efficiency
-        client.sendXml(response);
+        console.log(`[System] Client ${client.id} sent version: ${clientVer}. Echoing it back.`);
+        // 2. Respond with the EXACT SAME version
+        // const response = `<msg t='sys'><body action='verChk' r='0'><ver v='${clientVer}' /></body></msg>`;
+        this.handlePolicyRequest(client); // Send policy first
+        const apiOkResponse = `<msg t='sys'><body action='apiOK' r='0'></body></msg>`;
+        // 3. Send via XML helper
+        client.sendXml(apiOkResponse);
     }
-    /**
-     * Handles the 'getRmList' (Get Room List) action.
-     * Returns an empty room list to satisfy the client handshake sequence.
-     */
+    handleLogin(client, body) {
+        console.log(`[System] Client ${client.id} is attempting to login...`);
+        const loginResponse = {
+            b: {
+                r: -1,
+                o: {
+                    mod_level: 0,
+                    _cmd: "logOK",
+                    serverUserName: client.id.toString(),
+                    rk: Math.floor(Math.random() * 1000000000),
+                    serverTime: Date.now(),
+                    serverUserId: client.id,
+                },
+            },
+            t: "xt",
+        };
+        client.sendJson(loginResponse);
+        this.handleGetRoomList(client, body);
+    }
     handleGetRoomList(client, body) {
-        // Structure: <msg t='sys'><body action='getRmList' r='0'><rmList></rmList></body></msg>
-        const response = `<msg t='sys'><body action='getRmList' r='0'><rmList></rmList></body></msg>`;
-        client.sendXml(response);
+        const roomList = `<msg t='sys'><body action='getRmList' r='0'><rmList><rm id='1' priv='0' temp='0' game='0' max='50' spec='0' lim='0' cnt='1' name='Lobby' /></rmList></body></msg>`;
+        client.sendXml(roomList);
     }
 }
 exports.SystemController = SystemController;

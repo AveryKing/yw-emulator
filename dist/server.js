@@ -13,10 +13,10 @@ class Server {
         this.setupServer();
     }
     setupServer() {
-        this.wss.on('listening', () => {
+        this.wss.on("listening", () => {
             console.log(`[Server] YoWorld Emulator listening on port ${PORT}`);
         });
-        this.wss.on('connection', (socket) => {
+        this.wss.on("connection", (socket) => {
             this.handleConnection(socket);
         });
     }
@@ -25,16 +25,16 @@ class Server {
         const client = new Client_1.Client(socket, clientId);
         this.clients.set(clientId, client);
         console.log(`[Server] Client connected. ID: ${clientId}`);
-        socket.on('message', (data) => {
+        socket.on("message", (data) => {
             const message = data.toString();
-            // console.log(`[Inbound] ${message}`); // Uncomment for debugging
+            console.log(`[Inbound] ${message}`); // Uncomment for debugging
             this.router.route(client, message);
         });
-        socket.on('close', () => {
+        socket.on("close", () => {
             console.log(`[Server] Client disconnected. ID: ${clientId}`);
             this.clients.delete(clientId);
         });
-        socket.on('error', (err) => {
+        socket.on("error", (err) => {
             console.error(`[Server] Client error (ID: ${clientId}):`, err);
         });
     }

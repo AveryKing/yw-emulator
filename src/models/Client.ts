@@ -30,14 +30,14 @@ export class Client {
    * Helper to send an XML response.
    */
   public sendXml(xml: string): void {
-    this.send(xml);
+    this.send(xml + '\0');
   }
 
   /**
    * Helper to send a JSON response.
    */
   public sendJson(data: any): void {
-    this.send(JSON.stringify(data));
+    this.send(JSON.stringify(data) + '\0');
   }
 
   public getSocket(): WebSocket {

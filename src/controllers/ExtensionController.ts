@@ -1,7 +1,11 @@
 import { Client } from "../models/Client";
-import { LOGIN_SEQUENCE, rentToBuyItems } from "../data/mockData";
+import * as fs from "fs";
+import * as path from "path";
 
 export class ExtensionController {
+  // Cache the log data so we don't read the file 100 times
+  private static cachedLoginSequence: any[] | null = null;
+
   /**
    * Handles extension requests (t='xt').
    * These are typically game-specific logic commands.
@@ -20,87 +24,115 @@ export class ExtensionController {
     // TODO: Implement game logic routing here
   }
 
-  /**
-   * Handles JSON-based extension requests.
-   */
   public handleJsonRequest(client: Client, data: any): void {
-    const cmd = data._cmd;
+    // console.log(`[Extension] Handling JSON Command: ${data._cmd}`);
 
-    console.log(
-      `[Extension] Received JSON command '${cmd}' from user ${client.username}`
-    );
-
-    switch (cmd) {
+    switch (data._cmd) {
       case "activatePlayer":
       case "activatePlayer_YOWO5!":
         this.handleActivatePlayer(client, data);
         break;
-      case "sendMessage":
-        // Example: { "_cmd": "sendMessage", "msg": "Hello World", "recipient": ... }
-        console.log(`[Chat] ${client.username}: ${data.msg}`);
-        break;
-      case "updateCharacterPath":
-        // Example: { "_cmd": "updateCharacterPath", "x": 100, "y": 200, ... }
-        console.log(
-          `[Movement] ${client.username} moved to (${data.x}, ${data.y})`
-        );
-        break;
+
+      // Handle other commands that might come AFTER login if needed
       case "getRentToBuyItems":
-        this.handleGetRentToBuyItems(client);
+        this.sendXtResponse(client, { _cmd: "getRentToBuyItems", items: [] });
         break;
+
       default:
-        console.log(`[Extension] Unhandled JSON command: ${cmd}`);
+        // console.warn(`[Extension] Unhandled JSON command: ${data._cmd}`);
         break;
     }
   }
 
   private handleActivatePlayer(client: Client, data: any): void {
-    console.log(`[Extension] Starting Login Sequence for ${client.username}`);
+    console.log(
+      `[Extension] Activating player ${client.id} - Replaying FULL Log Sequence...`
+    );
 
-    // Iterate through the recorded login sequence
-    for (const packet of LOGIN_SEQUENCE) {
-      // Create a shallow copy to avoid modifying the original mock data permanently
-      // (though for deep objects like 'player', be careful if you need deep cloning)
-      let payload = JSON.parse(JSON.stringify(packet));
-
-      // Dynamic Patching for the initial activation packet
-      if (payload._cmd === "activatePlayer") {
-        payload.playerId = data.playerId || client.id;
-        // Generate a session ID if needed, or use the one from the client/server logic
-        payload.sessionId = `${payload.playerId}_${Math.floor(
-          Date.now() / 1000
-        )}`;
-
-        if (client.username) {
-          if (payload.player) {
-            payload.player.name = client.username;
-            payload.player.playerId = payload.playerId;
-          }
-        }
-        console.log(
-          `[Extension] Sending activatePlayer response for ID: ${payload.playerId}`
+    try {
+      // 1. Load the sequence if not already cached
+      if (!ExtensionController.cachedLoginSequence) {
+        const logPath = path.join(
+          process.cwd(),
+          "YoWorld_Login_1766706231225.json"
         );
-      } else {
+
+        if (!fs.existsSync(logPath)) {
+          console.error(`[Error] Could not find log file at: ${logPath}`);
+          return;
+        }
+
+        console.log(`[Extension] Loading log file from: ${logPath}`);
+        const rawFile = fs.readFileSync(logPath, "utf8");
+        const logJson = JSON.parse(rawFile);
+
+        // Filter only the packets the server SENT to the client
+        ExtensionController.cachedLoginSequence = logJson.logs
+          .filter((entry: any) => entry.dir === "SERVER_RECV")
+          .map((entry: any) => JSON.parse(entry.payload));
+
         console.log(
-          `[Extension] Replaying packet: ${payload._cmd} (ModelID: ${payload.m?.modelID})`
+          `[Extension] Loaded ${ExtensionController.cachedLoginSequence?.length} packets.`
         );
       }
 
-      this.sendXtResponse(client, payload);
+      // 2. Replay the sequence
+      const sequence = ExtensionController.cachedLoginSequence || [];
+      let packetCount = 0;
+
+      for (const packet of sequence) {
+        // Create a deep copy so we don't mess up the cached original
+        const response = JSON.parse(JSON.stringify(packet));
+
+        // --- DYNAMIC ID PATCHING ---
+        // The log has the original user's ID. We must replace it with YOUR client ID
+        // or the game might reject the data.
+        this.recursiveIdPatch(response, client.id);
+
+        // Send the packet
+        this.sendXtResponse(client, response);
+        packetCount++;
+      }
+
+      console.log(
+        `[Extension] Successfully sent ${packetCount} initialization packets.`
+      );
+    } catch (err) {
+      console.error("[Extension] Error replaying login sequence:", err);
     }
   }
 
-  private handleGetRentToBuyItems(client: Client): void {
-    const response = {
-      _cmd: "getRentToBuyItems",
-      items: rentToBuyItems,
-    };
-    this.sendXtResponse(client, response);
+  /**
+   * Helper to recursively find and replace 'playerId' and 'sessionId'
+   * in the massive JSON objects.
+   */
+  private recursiveIdPatch(obj: any, newId: number): void {
+    if (typeof obj !== "object" || obj === null) return;
+
+    // Check specific keys we want to patch
+    if (obj.hasOwnProperty("playerId")) {
+      obj["playerId"] = newId;
+    }
+    if (obj.hasOwnProperty("sessionId")) {
+      obj["sessionId"] = `${newId}_${Date.now()}`;
+    }
+
+    // Arrays (iterate through items)
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        this.recursiveIdPatch(item, newId);
+      }
+    }
+    // Objects (iterate through keys)
+    else {
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          this.recursiveIdPatch(obj[key], newId);
+        }
+      }
+    }
   }
 
-  /**
-   * Wraps the payload in the SmartFoxServer "XT" envelope and sends it as JSON.
-   */
   private sendXtResponse(client: Client, payload: any): void {
     const wrapper = {
       t: "xt",
